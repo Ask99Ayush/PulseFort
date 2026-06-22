@@ -1,0 +1,89 @@
+{
+  "title": "PulseFort Overview",
+  "schemaVersion": 39,
+  "version": 2,
+  "editable": true,
+  "panels": [
+    {
+      "title": "Prometheus Targets",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "count(up)"
+        }
+      ]
+    },
+    {
+      "title": "Container Count",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "count(container_last_seen)"
+        }
+      ]
+    },
+    {
+      "title": "Node CPU Usage %",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
+        }
+      ]
+    },
+    {
+      "title": "Node Memory Usage %",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))*100"
+        }
+      ]
+    },
+    {
+      "title": "Container CPU Usage",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(container_cpu_usage_seconds_total[5m])"
+        }
+      ]
+    },
+    {
+      "title": "Container Memory Usage",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "container_memory_usage_bytes"
+        }
+      ]
+    },
+    {
+      "title": "Container Network RX",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(container_network_receive_bytes_total[5m])"
+        }
+      ]
+    },
+    {
+      "title": "Container Network TX",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(container_network_transmit_bytes_total[5m])"
+        }
+      ]
+    },
+    {
+      "title": "Application Availability",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "up{job=\"pulsefort-app\"}"
+        }
+      ]
+    }
+  ]
+}
