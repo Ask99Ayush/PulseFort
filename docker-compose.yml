@@ -1,0 +1,243 @@
+services:
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: pulsefort-nginx
+
+    restart: unless-stopped
+
+    depends_on:
+      app:
+        condition: service_healthy
+
+    ports:
+      - "80:80"
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost/nginx-health || exit 1"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+
+    networks:
+      - pulsefort-network
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: pulsefort-postgres
+
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    networks:
+      - pulsefort-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: pulsefort-redis
+
+    restart: unless-stopped
+
+    command: redis-server --appendonly yes
+
+    volumes:
+      - redis_data:/data
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "ping"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    networks:
+      - pulsefort-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: pulsefort:latest
+    container_name: pulsefort-app
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    expose:
+      - "8000"
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8000/ready || exit 1"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    networks:
+      - pulsefort-network
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+
+    container_name: pulsefort-prometheus
+
+    restart: unless-stopped
+
+    ports:
+      - "9090:9090"
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:9090/-/healthy || exit 1"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+    networks:
+      - pulsefort-network
+
+  grafana:
+    image: grafana/grafana:12.1.0
+
+    container_name: pulsefort-grafana
+
+    restart: unless-stopped
+
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+
+    ports:
+      - "3000:3000"
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:3000/api/health || exit 1"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+
+    depends_on:
+      - prometheus
+
+    networks:
+      - pulsefort-network
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+
+    container_name: pulsefort-node-exporter
+
+    restart: unless-stopped
+
+    ports:
+      - "9100:9100"
+
+    command:
+      - "--path.rootfs=/host"
+
+    volumes:
+      - "/:/host:ro,rslave"
+
+    networks:
+      - pulsefort-network
+
+  # Uncomment on Linux EC2 deployment
+
+  # cadvisor:
+  #   image: gcr.io/cadvisor/cadvisor:v0.52.1
+  #   container_name: pulsefort-cadvisor
+  #
+  #   restart: unless-stopped
+  #
+  #   privileged: true
+  #
+  #   devices:
+  #     - /dev/kmsg
+  #
+  #   volumes:
+  #     - /:/rootfs:ro
+  #     - /var/run:/var/run:ro
+  #     - /sys:/sys:ro
+  #     - /var/lib/docker:/var/lib/docker:ro
+  #
+  #   ports:
+  #     - "8080:8080"
+  #
+  #   networks:
+  #     - pulsefort-network
+
+volumes:
+
+  postgres_data:
+
+  redis_data:
+
+  grafana_data:
+
+  prometheus_data:
+
+networks:
+  pulsefort-network:
+    driver: bridge
