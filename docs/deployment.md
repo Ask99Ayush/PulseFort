@@ -2,47 +2,45 @@
 
 ## Overview
 
-This guide covers infrastructure provisioning, application deployment, service verification, and CI/CD integration for PulseFort.
-
-PulseFort runs as a containerized platform using Docker Compose on an Ubuntu server. Infrastructure is provisioned through Terraform. Deployments can be performed manually or automated through GitHub Actions.
+PulseFort is deployed as a containerized platform using Docker Compose on AWS EC2. Infrastructure is provisioned with Terraform, while application deployment is automated through GitHub Actions.
 
 ---
 
 ## Deployment Architecture
 
-```
+```text
 Internet
-    │
-    ▼
-NGINX Reverse Proxy
-    │
-    ▼
-FastAPI Application
-   ├── PostgreSQL
-   └── Redis
+   |
+   v
+NGINX (HTTPS)
+   |
+   +--> FastAPI
+   +--> Grafana (/grafana)
+   +--> Prometheus (/prometheus)
 
-Monitoring Stack
-   ├── Prometheus
-   ├── Grafana
-   ├── Node Exporter
-   └── cAdvisor
+Internal Docker Network
+   |
+   +--> PostgreSQL
+   +--> Redis
+   +--> Node Exporter
+   +--> cAdvisor
 ```
 
 ---
 
 ## Prerequisites
 
-**Operating System**
+### Operating System
 
-- Ubuntu 22.04 LTS or later
+* Ubuntu 22.04 LTS or later
 
-**Required Software**
+### Required Software
 
-- Docker Engine
-- Docker Compose
-- Git
+* Docker Engine
+* Docker Compose
+* Git
 
-**Verify installation**
+### Verify Installation
 
 ```bash
 docker --version
@@ -50,101 +48,161 @@ docker compose version
 git --version
 ```
 
-**Network — Required Ports**
+---
 
-| Port | Service    |
-|------|------------|
-| 22   | SSH        |
-| 80   | HTTP       |
-| 443  | HTTPS      |
+## Network Requirements
 
+| Port | Purpose |
+| ---- | ------- |
+| 22   | SSH     |
+| 80   | HTTP    |
+| 443  | HTTPS   |
 
-
-Grafana is exposed through NGINX over HTTPS.
-
-Prometheus, Node Exporter, and cAdvisor remain internal-only services and are not directly exposed to the public internet.
+Only ports **80** and **443** are publicly exposed.
 
 ---
 
 ## Clone Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Ask99Ayush/PulseFort.git
 cd PulseFort
 ```
 
 ---
 
-## Environment Configuration
+## Configure Environment
 
 ```bash
 cp .env.example .env
 ```
 
-Update values for:
+Update values as required:
 
-- Database credentials
-- Redis configuration
-- Monitoring credentials
-- Application settings
+* PostgreSQL credentials
+* Redis settings
+* Grafana credentials
+* Application configuration
 
 ---
 
-## Build and Start
+## Deploy Platform
 
-**Build containers**
-
-```bash
-docker compose build
-```
-
-**Start all services**
+Build and start all services:
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-**Verify running containers**
+Verify containers:
 
 ```bash
 docker compose ps
 ```
 
-Expected services: `nginx`, `app`, `postgres`, `redis`, `prometheus`, `grafana`, `node-exporter`, `cadvisor`
+Expected services:
+
+```text
+nginx
+app
+postgres
+redis
+prometheus
+grafana
+node-exporter
+cadvisor
+```
 
 ---
 
-## Service Verification
+## Verify Deployment
 
-**Health**
+### Application Health
 
 ```bash
 curl http://localhost/health
 ```
 
-```json
-{ "status": "healthy" }
-```
-
-**Liveness**
-
-```bash
-curl http://localhost/live
-```
-
-```json
-{ "alive": true }
-```
-
-**Readiness**
+### Application Readiness
 
 ```bash
 curl http://localhost/ready
 ```
 
-```json
-{ "ready": true, "postgres": true, "redis": true }
+### Running Containers
+
+```bash
+docker ps
 ```
 
 ---
 
+## Access Services
+
+```text
+Application
+https://SERVER_IP/
+
+Grafana
+https://SERVER_IP/grafana/
+
+Prometheus
+https://SERVER_IP/prometheus/
+```
+
+---
+
+## CI/CD Deployment
+
+Production deployments are automated through GitHub Actions.
+
+```text
+Developer
+    |
+    v
+GitHub
+    |
+    v
+GitHub Actions
+    |
+    v
+Validate
+    |
+    v
+Build
+    |
+    v
+Deploy
+    |
+    v
+Health Checks
+    |
+    v
+Production
+```
+
+---
+
+## Troubleshooting
+
+View container status:
+
+```bash
+docker compose ps
+```
+
+View logs:
+
+```bash
+docker compose logs -f
+```
+
+Restart services:
+
+```bash
+docker compose restart
+```
+
+---
+
+PulseFort follows a production-oriented deployment model with infrastructure automation, container orchestration, HTTPS routing, monitoring, and automated CI/CD workflows.
