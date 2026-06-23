@@ -2,101 +2,99 @@
 
 ## Overview
 
-Security is a fundamental design principle within PulseFort and is implemented across infrastructure, operating systems, containers, deployment pipelines, and operational workflows. The objective is to minimize attack surface, protect critical services, prevent credential exposure, and enforce production-oriented security practices.
-
-PulseFort follows a layered security model where controls are applied at multiple levels to provide defense in depth.
+Security is implemented across infrastructure, networking, operating systems, containers, monitoring, and deployment workflows. PulseFort follows a layered security model designed to reduce attack surface, protect critical services, and enforce production-oriented security practices.
 
 ---
 
 ## Security Architecture
 
-```
+```text
 Internet
-    │
-    ▼
-AWS Security Groups
-    │
-    ▼
+    |
+    v
+AWS Security Group
+    |
+    v
 UFW Firewall
-    │
-    ▼
-NGINX Reverse Proxy
-    │
-    ▼
-Application Containers
-    │
-    ▼
-PostgreSQL / Redis
+    |
+    v
+NGINX (HTTPS)
+    |
+    +--> FastAPI
+    +--> Grafana
+    +--> Prometheus
+
+Internal Docker Network
+    |
+    +--> PostgreSQL
+    +--> Redis
+    +--> Node Exporter
+    +--> cAdvisor
 ```
 
-Additional layers: Fail2Ban, SSH Hardening, GitHub Secrets, Container Isolation.
+Additional controls include Fail2Ban, SSH Hardening, Container Isolation, and GitHub Secrets.
 
 ---
 
 ## Security Principles
 
-Least privilege access, defense in depth, secure defaults, infrastructure isolation, credential protection, and continuous validation guide all infrastructure and operational decisions.
+* Least Privilege Access
+* Defense in Depth
+* Secure Defaults
+* Service Isolation
+* Credential Protection
+* Automated Validation
 
 ---
 
 ## Infrastructure Security
 
-**AWS Security Groups — Publicly Accessible**
+### Public Access
 
 | Port | Service |
-|------|---------|
+| ---- | ------- |
 | 22   | SSH     |
 | 80   | HTTP    |
 | 443  | HTTPS   |
 
-**Restricted — Internal Only**
+### Internal Services
 
 | Service       | Port |
-|---------------|------|
+| ------------- | ---- |
 | PostgreSQL    | 5432 |
 | Redis         | 6379 |
-| Prometheus    | 9090 |
-| Grafana       | 3000 |
 | Node Exporter | 9100 |
 | cAdvisor      | 8080 |
 
-These services are inaccessible from the public internet by design.
+These services are accessible only through the Docker network.
 
 ---
 
 ## Host Security
 
-**UFW Firewall**
+### UFW Firewall
 
-Allowed rules:
+Allowed inbound traffic:
 
-```
+```text
 22/tcp
 80/tcp
 443/tcp
 ```
 
-All other inbound traffic is denied by default.
-
-Verify:
+Verify status:
 
 ```bash
-sudo ufw status numbered
+sudo ufw status
 ```
 
-Allow SSH access first, then enable UFW. Never enable UFW before confirming SSH access to avoid lockout.
+All other inbound traffic is denied by default.
 
 ---
 
 ## Fail2Ban
 
-Protects SSH against brute-force and automated login attacks.
-
-| Setting    | Value      |
-|------------|------------|
-| Find Time  | 10 minutes |
-| Max Retry  | 5 attempts |
-| Ban Time   | 1 hour     |
+Protects SSH against brute-force attacks.
 
 Verify:
 
@@ -104,188 +102,179 @@ Verify:
 sudo fail2ban-client status sshd
 ```
 
-Review active jails, banned addresses, and failed login attempts.
+Features:
+
+* Automatic IP banning
+* Failed login detection
+* SSH attack mitigation
 
 ---
 
 ## SSH Hardening
 
-**Implemented Controls**
+Implemented controls:
 
-- Root login disabled
-- Password authentication disabled
-- Public key authentication required
-- Reduced login attempts
-- Administrative access restriction
+* Root login disabled
+* Password authentication disabled
+* Public key authentication required
+* Limited login attempts
 
-**Validate configuration**
+Validate configuration:
 
 ```bash
 sudo sshd -t
 ```
 
-No output means the configuration is valid.
-
-**Lockout Prevention**
-
-Before disabling password authentication:
-
-1. Upload SSH public key
-2. Confirm key-based login works
-3. Open a second SSH session
-4. Disable password authentication
-5. Restart SSH service
-6. Verify access from the second session
-
-Never disable password authentication without a confirmed backup session.
+No output indicates a valid configuration.
 
 ---
 
 ## Container Security
 
-**Implemented Controls**
+Security measures include:
 
-- Non-root containers
-- Service isolation via Docker networks
-- Environment-based configuration
-- Health checks on all services
-- Minimal runtime dependencies
+* Isolated Docker network
+* Health checks
+* Environment-based configuration
+* Service separation
+* Minimal container exposure
 
-**Internal Networking**
-
-```
+```text
 FastAPI
  ├── PostgreSQL
  └── Redis
 ```
 
-Database services are not exposed to public interfaces.
+Backend services are not directly accessible from the internet.
 
-**cAdvisor Exception**
+---
 
-cAdvisor requires elevated Docker visibility for container monitoring. Additional permissions are scoped strictly to metrics collection and do not extend application privileges.
+## Monitoring Security
+
+Monitoring services are exposed through NGINX over HTTPS.
+
+### Grafana
+
+```text
+https://SERVER_IP/grafana/
+```
+
+### Prometheus
+
+```text
+https://SERVER_IP/prometheus/
+```
+
+### Internal Only
+
+```text
+Node Exporter
+cAdvisor
+PostgreSQL
+Redis
+```
+
+Only ports **80** and **443** are publicly exposed.
 
 ---
 
 ## Secret Management
 
-**GitHub Secrets — CI/CD Pipeline**
+### GitHub Secrets
 
-Infrastructure:
+Examples:
 
-```
+```text
 SERVER_HOST
 SERVER_USER
 SERVER_SSH_KEY
-```
 
-Database:
-
-```
 POSTGRES_DB
 POSTGRES_USER
 POSTGRES_PASSWORD
-```
 
-Monitoring:
-
-```
 GRAFANA_ADMIN_USER
 GRAFANA_ADMIN_PASSWORD
 ```
 
-**Environment Variables — Server Runtime**
+### Runtime Configuration
 
-Stored in `.env`. Never commit this file.
+Environment variables are stored in:
 
-Verify `.gitignore` includes:
-
-```
+```text
 .env
 ```
+
+Never commit `.env` files to source control.
 
 ---
 
 ## Deployment Security
 
-GitHub Actions handles all automated deployments.
+GitHub Actions deployments include:
 
-Controls applied:
+* Encrypted secrets
+* SSH key authentication
+* Automated validation
+* Health verification
+* Readiness verification
 
-- Encrypted GitHub Secrets
-- SSH key authentication
-- Automated validation before deployment
-- Health and readiness verification after deployment
-
-No credentials are hardcoded anywhere in the codebase.
-
----
-
-## Monitoring Exposure Policy
-
-**Public access allowed:**
-
-```
-80    HTTP
-443   HTTPS
-```
-
-Monitoring Access
-
-Grafana is exposed through NGINX:
-
-https://SERVER_IP/grafana/
-
-Prometheus is internal-only and not publicly exposed.
-
-Node Exporter and cAdvisor remain internal-only.
-8080  cAdvisor
-```
+No credentials are hardcoded in the repository.
 
 ---
 
 ## Backup Security
 
-Backup files may contain sensitive production data.
+Protect backup files:
 
 ```bash
 chmod 700 backups
 chmod 600 backups/*.sql
 ```
 
-Recommended practices: encrypt archives, restrict administrator access, test recovery regularly, store critical backups offsite.
+Recommended practices:
+
+* Restrict administrator access
+* Encrypt sensitive backups
+* Store critical backups securely
+* Test recovery procedures regularly
 
 ---
 
-## Security Validation Checklist
+## Security Validation
+
+Verify platform security:
 
 ```bash
-sudo ufw status                        # firewall
-sudo fail2ban-client status sshd       # brute-force protection
-sudo sshd -t                           # SSH config
-docker compose ps                      # container status
+sudo ufw status
+
+sudo fail2ban-client status sshd
+
+sudo sshd -t
+
+docker compose ps
 ```
 
-Secrets review:
+Review:
 
-- No credentials in repository
-- No secrets in logs or documentation
-- No secrets in container images
+* Container health
+* Firewall rules
+* SSH configuration
+* Fail2Ban status
+* Secret management practices
 
 ---
 
 ## Future Enhancements
 
-- Cloudflare WAF and DDoS protection
-- Let's Encrypt automation
-- Container image scanning
-- Vulnerability scanning
-- Secret rotation policies
-- Centralized log aggregation
-- Intrusion detection
+* Let's Encrypt SSL
+* Cloudflare WAF
+* Vulnerability Scanning
+* Container Image Scanning
+* Secret Rotation
+* Centralized Logging
+* Intrusion Detection
 
 ---
 
-## Conclusion
-
-PulseFort implements a layered security model covering infrastructure protection, host hardening, container isolation, secret management, deployment security, and monitoring exposure controls. By combining AWS Security Groups, UFW, Fail2Ban, SSH hardening, and secure CI/CD workflows, the platform demonstrates practical security practices applied in modern production environments.
+PulseFort applies security controls across infrastructure, networking, containers, monitoring, and deployment workflows to provide a secure and production-oriented operating environment.

@@ -2,11 +2,18 @@
 
 ## Overview
 
-PulseFort uses PostgreSQL logical backups generated through `pg_dump`. Backups are timestamped, stored locally, and can be restored using the provided recovery scripts. The strategy supports disaster recovery, data migration, and rollback scenarios.
+PulseFort uses PostgreSQL logical backups generated with `pg_dump`. Backups are stored locally and can be restored using the provided recovery script.
+
+The backup workflow supports:
+
+* Disaster recovery
+* Data restoration
+* Environment migration
+* Operational rollback
 
 ---
 
-## Creating a Backup
+## Create a Backup
 
 ```bash
 ./scripts/backup.sh
@@ -14,44 +21,40 @@ PulseFort uses PostgreSQL logical backups generated through `pg_dump`. Backups a
 
 Example output:
 
-```
-backups/pulsefort_20260622_120000.sql
+```text
+backups/pulsefort_20260623_120000.sql
 ```
 
-Each file contains a complete logical export of the PostgreSQL database.
+Each backup contains a complete PostgreSQL database export.
 
 ---
 
-## Retention Policy
+## Backup Retention
 
-Backups older than 7 days are automatically removed during each backup run.
+Backups older than 7 days are automatically removed.
 
 ```bash
-find backups \
-  -type f \
-  -name "*.sql" \
-  -mtime +7 \
-  -delete
+find backups -type f -name "*.sql" -mtime +7 -delete
 ```
 
-This keeps storage usage predictable while maintaining recent recovery points.
+This keeps storage usage predictable while preserving recent recovery points.
 
 ---
 
 ## Backup Security
 
-Restrict access to the backup directory and its contents.
+Restrict access to backup files:
 
 ```bash
 chmod 700 backups
 chmod 600 backups/*.sql
 ```
 
-Only authorized administrators should have read access to backup files.
+Only authorized administrators should have access to backup data.
 
 ---
 
-## Restore Procedure
+## Restore a Backup
 
 ```bash
 ./scripts/restore.sh backups/<backup-file>.sql
@@ -60,36 +63,29 @@ Only authorized administrators should have read access to backup files.
 Example:
 
 ```bash
-./scripts/restore.sh backups/pulsefort_20260622_120000.sql
+./scripts/restore.sh backups/pulsefort_20260623_120000.sql
 ```
 
-The restore script imports the selected backup into PostgreSQL and rebuilds the database state.
+The selected backup is imported into PostgreSQL and the database state is restored.
 
 ---
 
-## Recovery Validation
+## Validate Recovery
 
-After a restore, verify the platform is fully operational.
-
-**Verify PostgreSQL**
+### Verify Database
 
 ```bash
-docker compose exec postgres psql -U pulsefort -d pulsefort
+docker compose exec postgres \
+psql -U pulsefort -d pulsefort
 ```
 
-**Verify Application Data**
-
-```sql
-SELECT * FROM users;
-```
-
-**Verify Platform Readiness**
+### Verify Application Readiness
 
 ```bash
 curl http://localhost/ready
 ```
 
-Expected:
+Expected response:
 
 ```json
 {
@@ -99,26 +95,51 @@ Expected:
 }
 ```
 
+### Verify Running Services
+
+```bash
+docker ps
+```
+
+Ensure PostgreSQL, Redis, FastAPI, NGINX, Prometheus, and Grafana are healthy.
+
 ---
 
 ## Disaster Recovery Workflow
 
-1. Provision infrastructure
-2. Start the Docker Compose stack
-3. Restore the latest database backup
-4. Verify PostgreSQL connectivity
-5. Verify Redis availability
-6. Validate application readiness
-7. Confirm monitoring services are running
-8. Resume normal operations
+```text
+Restore Infrastructure
+        |
+        v
+Start Containers
+        |
+        v
+Restore Database
+        |
+        v
+Verify PostgreSQL
+        |
+        v
+Verify Application
+        |
+        v
+Verify Monitoring
+        |
+        v
+Resume Operations
+```
 
 ---
 
 ## Future Enhancements
 
-- Compressed backup archives
-- Automated scheduled backups
-- AWS S3 remote storage
-- Backup integrity verification
-- Encrypted archives
-- Cross-region replication
+* Scheduled backups
+* Compressed archives
+* AWS S3 backup storage
+* Backup integrity verification
+* Encrypted backups
+* Cross-region replication
+
+---
+
+PulseFort includes documented backup and recovery procedures to ensure operational continuity and reliable disaster recovery.
