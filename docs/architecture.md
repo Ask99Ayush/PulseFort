@@ -2,37 +2,44 @@
 
 ## Overview
 
-PulseFort is a production-focused backend platform designed to demonstrate modern DevOps, cloud infrastructure, observability, security, and deployment practices. The application logic is intentionally simple, allowing the architecture to highlight operational excellence, automation, and reliability.
+PulseFort is a production-oriented backend platform built to demonstrate modern DevOps, cloud infrastructure, security, observability, and deployment practices. The application layer remains intentionally lightweight so the focus stays on infrastructure automation, operational excellence, monitoring, and reliability.
 
-The system follows a layered architecture where each component has a clear responsibility. This improves maintainability, scalability, and operational clarity while keeping the deployment model simple.
+The platform follows a layered architecture that separates networking, application services, data services, monitoring, and deployment automation.
 
 ---
 
 ## Architecture Goals
 
-- **Infrastructure First** — Fully automated and reproducible environments
-- **Operational Simplicity** — Easy deployment, debugging, and maintenance
-- **Security by Default** — Built-in protection across all layers
-- **Observability** — Full visibility into system behavior
-- **Reliability** — Failure detection and recovery mechanisms
-- **Automation** — Minimal manual intervention through CI/CD
+* Infrastructure as Code
+* Security by Default
+* Operational Simplicity
+* Full Observability
+* High Reliability
+* Automated Deployments
 
 ---
 
 ## High-Level Architecture
 
-PulseFort is organized into five layers: User Access, Reverse Proxy, Application, Data, and Monitoring.
+```text
+Internet
+   |
+   v
+NGINX (HTTPS)
+   |
+   +--> FastAPI
+   +--> Grafana (/grafana)
+   +--> Prometheus (/prometheus)
 
+Internal Docker Network
+   |
+   +--> PostgreSQL
+   +--> Redis
+   +--> Node Exporter
+   +--> cAdvisor
 ```
-Users → Internet → NGINX → FastAPI → PostgreSQL / Redis
 
-Monitoring:
-Node Exporter ──► Prometheus ──► Grafana
-cAdvisor      ──► Prometheus
-FastAPI       ──► Prometheus
-```
-
-This design separates concerns while remaining suitable for a single-server deployment.
+This architecture provides a single secure entry point while keeping backend services isolated from direct public access.
 
 ---
 
@@ -40,52 +47,49 @@ This design separates concerns while remaining suitable for a single-server depl
 
 Infrastructure is provisioned using Terraform on AWS.
 
-```
-VPC (10.0.0.0/16)
-└── Public Subnet (10.0.1.0/24)
-    ├── Internet Gateway
-    ├── Route Table
-    ├── Security Groups
-    ├── EC2 Instance
-    └── Elastic IP
+```text
+AWS
+└── VPC
+    └── Public Subnet
+        ├── Internet Gateway
+        ├── Route Table
+        ├── Security Group
+        ├── EC2 Instance
+        └── Elastic IP
 ```
 
-**Security Group — Allowed Inbound**
+### Publicly Exposed Ports
 
-```
+```text
 22    SSH
 80    HTTP
 443   HTTPS
 ```
 
-**Internal Only**
-
-```
-PostgreSQL    Redis    Prometheus    Grafana
-Node Exporter    cAdvisor
-```
+All other services remain accessible only through the Docker network.
 
 ---
 
 ## Compute Architecture
 
-A single EC2 instance hosts all services via Docker Compose.
+A single EC2 instance hosts the complete platform using Docker Compose.
 
-Responsibilities:
+Responsibilities include:
 
-- Running application and monitoring containers
-- Hosting the NGINX reverse proxy
-- Managing PostgreSQL and Redis
+* Application hosting
+* Reverse proxy management
+* Database hosting
+* Cache management
+* Monitoring and observability
+* Deployment execution
 
-This model keeps the deployment simple, cost-effective, and easy to debug.
+This approach keeps the environment cost-effective, reproducible, and easy to operate.
 
 ---
 
 ## Container Architecture
 
-Docker Compose orchestrates all services on a single host.
-
-```
+```text
 Docker Host
 ├── NGINX
 ├── FastAPI
@@ -97,39 +101,56 @@ Docker Host
 └── cAdvisor
 ```
 
-Benefits: consistent environments, service isolation, portable deployments.
+### Application Services
+
+| Service    | Purpose               |
+| ---------- | --------------------- |
+| FastAPI    | API Layer             |
+| PostgreSQL | Persistent Storage    |
+| Redis      | Cache Layer           |
+| NGINX      | Reverse Proxy & HTTPS |
+
+### Monitoring Services
+
+| Service       | Purpose            |
+| ------------- | ------------------ |
+| Prometheus    | Metrics Collection |
+| Grafana       | Dashboards         |
+| Node Exporter | Host Metrics       |
+| cAdvisor      | Container Metrics  |
 
 ---
 
 ## Reverse Proxy Architecture
 
-NGINX is the single entry point for all inbound traffic.
+NGINX acts as the centralized ingress layer.
 
+```text
+Client
+   |
+   v
+NGINX
+   |
+   +--> FastAPI
+   +--> Grafana
+   +--> Prometheus
 ```
-Client → NGINX
-           ├── FastAPI
-           └── Grafana
-
-Internal Monitoring Network
-Prometheus
-Node Exporter
-cAdvisor
 
 Responsibilities:
 
-- HTTPS termination
-- Request routing
-- Security headers
-- Rate limiting
-- Access logging
+* HTTPS termination
+* Request routing
+* Security headers
+* Rate limiting
+* Access logging
 
 ---
 
 ## Application Architecture
 
-Built with FastAPI, structured for clarity and separation of concerns.
+The FastAPI application is organized using a layered structure.
 
-```
+```text
 app/
 ├── api/
 ├── core/
@@ -140,52 +161,80 @@ app/
 └── main.py
 ```
 
-**API Endpoints**
+### Health Endpoints
 
-```
-GET  /           Root
-GET  /health     Health check
-GET  /live       Liveness
-GET  /ready      Readiness
-POST /users      Create user
-GET  /users      List users
-GET  /users/{id} Get user
-DELETE /users/{id} Delete user
-POST /cache      Set cache
-GET  /cache/{key} Get cache
-GET  /metrics    Prometheus metrics
+```text
+GET /health
+GET /live
+GET /ready
+GET /metrics
 ```
 
-**Layers**
+### Functional Endpoints
 
-- API Layer — handles requests and responses
-- Service Layer — business logic and dependency coordination
-- Models — database schema via SQLAlchemy
+```text
+POST /users
+GET  /users
+GET  /users/{id}
+DELETE /users/{id}
+
+POST /cache
+GET  /cache/{key}
+```
 
 ---
 
 ## Data Architecture
 
-**PostgreSQL** handles persistent storage with ACID compliance, strong consistency, and reliable transactions. Data is persisted through a Docker volume so it survives container restarts.
+### PostgreSQL
 
-**Redis** provides in-memory caching to reduce database load and improve response latency.
+Provides persistent relational storage for application data.
+
+Features:
+
+* ACID transactions
+* Durable storage
+* Volume-backed persistence
+* Containerized deployment
+
+### Redis
+
+Provides high-speed in-memory caching.
+
+Features:
+
+* Low-latency access
+* Reduced database load
+* Improved response times
 
 ---
 
 ## Monitoring Architecture
 
-```
-FastAPI       ──► Prometheus ──► Grafana
+```text
+FastAPI       ──► Prometheus
 Node Exporter ──► Prometheus
 cAdvisor      ──► Prometheus
+                     |
+                     v
+                  Grafana
 ```
 
-| Component     | Purpose                  |
-|---------------|--------------------------|
-| Prometheus    | Metrics collection       |
-| Grafana       | Visualization dashboards |
-| Node Exporter | Host-level metrics       |
-| cAdvisor      | Container metrics        |
+### Access Paths
+
+```text
+https://SERVER_IP/prometheus/
+https://SERVER_IP/grafana/
+```
+
+### Monitoring Components
+
+| Component     | Purpose              |
+| ------------- | -------------------- |
+| Prometheus    | Metrics Collection   |
+| Grafana       | Visualization        |
+| Node Exporter | Host Monitoring      |
+| cAdvisor      | Container Monitoring |
 
 ---
 
@@ -193,64 +242,116 @@ cAdvisor      ──► Prometheus
 
 Security is enforced across multiple layers.
 
-| Layer          | Controls                                    |
-|----------------|---------------------------------------------|
-| Infrastructure | AWS Security Groups, network segmentation   |
-| Host           | UFW, Fail2Ban, SSH hardening                |
-| Containers     | Non-root execution, isolated networking     |
-| Secrets        | Environment variables, GitHub Secrets       |
+| Layer       | Controls                               |
+| ----------- | -------------------------------------- |
+| AWS         | Security Groups                        |
+| Host        | UFW, Fail2Ban, SSH Hardening           |
+| NGINX       | HTTPS, Security Headers, Rate Limiting |
+| Containers  | Network Isolation                      |
+| CI/CD       | GitHub Secrets                         |
+| Application | Health Validation                      |
 
 ---
 
 ## Reliability Architecture
 
-**Health Checks**
+### Health Checks
 
-```
-GET /health    Application availability
-GET /live      Process health
-GET /ready     Dependency validation (PostgreSQL, Redis)
+```text
+GET /health
+GET /live
+GET /ready
 ```
 
-Docker restart policies automatically recover failed services. Deployments are health-gated and validated before being considered successful.
+### Reliability Features
+
+* Docker health checks
+* Automatic container restart policies
+* Dependency validation
+* Deployment health verification
+* Operational runbooks
 
 ---
 
 ## Backup Architecture
 
-```
-Backup:   PostgreSQL → backup.sh  → backups/
-Restore:  backups/   → restore.sh → PostgreSQL
+```text
+PostgreSQL
+     |
+     v
+ backup.sh
+     |
+     v
+ Backup Storage
+
+Restore Flow
+
+Backup Storage
+     |
+     v
+ restore.sh
+     |
+     v
+ PostgreSQL
 ```
 
-Timestamped backups with a 7-day retention policy. Backup files are permission-restricted and intended for administrator access only.
+Features:
+
+* Automated backups
+* Timestamped backup files
+* Retention management
+* Recovery procedures
 
 ---
 
 ## CI/CD Architecture
 
-```
-Developer → GitHub → GitHub Actions → Validation → Build → Deployment → Health Check
+```text
+Developer
+    |
+    v
+GitHub
+    |
+    v
+GitHub Actions
+    |
+    v
+Validate
+    |
+    v
+Build
+    |
+    v
+Deploy
+    |
+    v
+Health Checks
+    |
+    v
+Production
 ```
 
-**Stages**
+### Pipeline Stages
 
-- Validation — Python, Docker, Terraform checks
-- Deployment — service restart, readiness verification
+* Validation
+* Docker Build
+* Terraform Validation
+* Deployment
+* Health Verification
 
 ---
 
 ## Future Enhancements
 
-- Cloudflare CDN and WAF integration
-- Automated SSL via Let's Encrypt
-- Blue-green deployments
-- Centralized log aggregation
-- Alerting and notification pipelines
-- Multi-environment Terraform workspaces
+* Let's Encrypt SSL
+* Cloudflare Integration
+* Blue-Green Deployments
+* Centralized Logging
+* Alerting Pipelines
+* Multi-Environment Infrastructure
 
 ---
 
 ## Conclusion
 
-PulseFort demonstrates a complete production-ready architecture combining infrastructure automation, containerization, monitoring, security, and deployment workflows. It emphasizes operational simplicity and visibility while reflecting practices used in real-world cloud environments.
+PulseFort demonstrates a production-style architecture combining Infrastructure as Code, containerization, monitoring, security hardening, automated deployments, and operational reliability. The platform prioritizes simplicity, visibility, and automation while reflecting real-world DevOps and platform engineering practices.

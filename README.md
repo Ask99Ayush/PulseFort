@@ -1,8 +1,6 @@
 # PulseFort
 
-### A Production-Grade Backend Platform Demonstrating Real-World DevOps and Platform Engineering Practices
-
----
+![PulseFort Architecture Diagram](assets/architecture-diagram.png)
 
 ## Table of Contents
 
@@ -106,13 +104,16 @@ The result is a production-style environment capable of demonstrating the comple
 
 ## 5. Architecture Diagram
 
-The architecture is designed around operational simplicity, service isolation, observability, and deployment automation.
+PulseFort is designed around service isolation, security, observability, and automated deployment workflows.
 
-<p align="center">
-  <img src="assets/architecture-diagram.png" alt="PulseFort Architecture Diagram" width="850">
-</p>
+The platform combines FastAPI, PostgreSQL, Redis, NGINX, Prometheus, Grafana, Node Exporter, and cAdvisor in a production-oriented architecture deployed on AWS infrastructure.
+
+**PulseFort Architecture**
+
+![PulseFort Architecture Diagram](assets/architecture-diagram.png)
 
 ---
+
 
 ## 6. Technology Stack
 
@@ -261,65 +262,62 @@ Core infrastructure components include:
 
 The infrastructure layer provides a consistent and reproducible deployment environment while maintaining clear separation between application services, networking, monitoring, and operational tooling. Any environment can be torn down and rebuilt identically from code.
 
----
-
 ## 10. Container Architecture
 
-The platform operates as a multi-container environment managed through Docker Compose.
+PulseFort runs as a multi-container platform orchestrated with Docker Compose.
 
 **Application Services**
 
-| Service | Responsibility |
-|---|---|
-| FastAPI | API layer |
-| PostgreSQL | Persistent data |
-| Redis | Cache layer |
-| NGINX | Reverse proxy |
+| Service    | Responsibility        |
+| ---------- | --------------------- |
+| FastAPI    | API Layer             |
+| PostgreSQL | Persistent Storage    |
+| Redis      | Caching Layer         |
+| NGINX      | Reverse Proxy & HTTPS |
 
 **Observability Services**
 
-| Service | Responsibility |
-|---|---|
-| Prometheus | Metrics collection |
-| Grafana | Visualization |
-| Node Exporter | Host monitoring |
-| cAdvisor | Container monitoring |
+| Service       | Responsibility             |
+| ------------- | -------------------------- |
+| Prometheus    | Metrics Collection         |
+| Grafana       | Dashboards & Visualization |
+| Node Exporter | Host Monitoring            |
+| cAdvisor      | Container Monitoring       |
 
-This architecture enables service isolation, simplified deployments, easier maintenance, and full operational visibility across the platform.
+This architecture provides service isolation, simplified deployments, operational visibility, and production-ready scalability.
 
-<p align="center">
-  <img src="screenshots/docker-compose-services.png" alt="Docker Compose Services Running" width="800">
-</p>
+**Running Services**
+
+![Docker Compose Services Running](screenshots/docker-compose-services.png)
 
 ---
 
 ## 11. Infrastructure as Code
 
-Infrastructure provisioning is handled entirely through Terraform using a modular architecture.
+PulseFort provisions infrastructure using Terraform with a modular architecture.
 
-**Networking Module** — VPC creation, subnet provisioning, route management.
+**Modules**
 
-**VPS Module** — EC2 provisioning, Elastic IP assignment, bootstrap automation.
+* **Networking** — VPC, Subnets, Route Tables
+* **VPS** — EC2 Instance and Elastic IP
+* **Firewall** — Security Groups and Access Rules
+* **Environment** — Configuration and Variable Management
 
-**Firewall Module** — Security group configuration, inbound access rules, outbound policies.
+This approach ensures consistent, repeatable, and version-controlled infrastructure deployments.
 
-**Production Environment** — Environment configuration, variable management, deployment consistency across runs.
+**Terraform Provisioning**
 
-<p align="center">
-  <img src="screenshots/terraform-apply.png" alt="Terraform Apply Output" width="800">
-</p>
+![Terraform Apply Output](screenshots/terraform-apply.png)
 
-<p align="center">
-  <img src="screenshots/aws-infrastructure.png" alt="AWS Infrastructure Console" width="800">
-</p>
+**AWS Infrastructure**
+
+![AWS Infrastructure Console](screenshots/aws-infrastructure.png)
 
 ---
 
 ## 12. Monitoring and Observability
 
-Operational visibility is a foundational component of PulseFort. Every production system should provide actionable insight into application behavior, infrastructure health, service dependencies, and resource utilization.
-
-PulseFort includes a dedicated observability stack that enables engineers to monitor system performance, troubleshoot incidents, validate deployments, and identify operational bottlenecks before they become outages.
+PulseFort includes a complete monitoring stack for application, infrastructure, and container visibility.
 
 **Monitoring Architecture**
 
@@ -338,35 +336,53 @@ cAdvisor      --> Prometheus
 
 **Prometheus**
 
-Prometheus acts as the central metrics collection platform for the entire stack.
+Prometheus collects application, infrastructure, and container metrics across the platform.
 
-- Application Metrics: request volume, endpoint activity, application availability, health status
-- Infrastructure Metrics: CPU utilization, memory consumption, disk usage, network activity
-- Container Metrics: container CPU usage, container memory usage, container network statistics, runtime information
+Access:
+
+```text
+https://SERVER_IP/prometheus/
+```
 
 **Grafana**
 
-Grafana provides operational dashboards and visualization capabilities on top of Prometheus data, covering infrastructure health, application health, container statistics, host resource usage, service availability, and deployment monitoring. Grafana transforms raw metrics into meaningful operational insight that helps engineers understand platform behavior in real time.
+Grafana provides dashboards for infrastructure health, container performance, service availability, and operational monitoring.
+
+Access:
+
+```text
+https://SERVER_IP/grafana/
+```
 
 **Production Exposure Model**
 
-Grafana is exposed through NGINX over HTTPS, while Prometheus, Node Exporter, and cAdvisor remain accessible only within the internal Docker network. This reduces attack surface and follows common production monitoring practices.
+```text
+Internet
+   |
+   v
+NGINX (HTTPS)
+   |
+   +--> FastAPI
+   +--> Grafana (/grafana)
+   +--> Prometheus (/prometheus)
 
-**Node Exporter**
+Internal Docker Network
+   |
+   +--> Node Exporter
+   +--> cAdvisor
+   +--> PostgreSQL
+   +--> Redis
+```
 
-Node Exporter provides host-level metrics directly from the EC2 instance, including CPU usage, memory usage, disk utilization, filesystem statistics, network throughput, and system load.
+Only ports **80** and **443** are publicly exposed. Monitoring services are securely accessed through NGINX while backend services remain isolated within the Docker network.
 
-**cAdvisor**
+**Prometheus Targets**
 
-cAdvisor provides container-level monitoring across the platform, including resource consumption, container lifecycle events, CPU allocation, memory allocation, network utilization, and filesystem usage.
+![Prometheus Targets Healthy](screenshots/prometheus-targets.png)
 
-<p align="center">
-  <img src="screenshots/prometheus-targets.png" alt="Prometheus Targets Healthy" width="800">
-</p>
+**Grafana Dashboard**
 
-<p align="center">
-  <img src="screenshots/grafana-dashboard.png" alt="Grafana Dashboard" width="800">
-</p>
+![Grafana Dashboard](screenshots/grafana-dashboard.png)
 
 ---
 
@@ -408,37 +424,38 @@ Sensitive values are never committed to source control under any circumstances. 
 
 ## 14. Reliability Engineering
 
-Reliability is treated as a core requirement of PulseFort, not an optional feature bolted on afterward. The platform incorporates operational safeguards designed to improve service stability and deployment confidence.
+Reliability is a core design principle of PulseFort. The platform includes operational safeguards that improve service stability, recovery, and deployment confidence.
 
 **Health Checks**
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /health` | Verifies overall application availability |
-| `GET /live` | Verifies that the application process itself is running correctly |
-| `GET /ready` | Validates critical dependencies (PostgreSQL, Redis) before declaring the service ready |
+| Endpoint      | Purpose                                     |
+| ------------- | ------------------------------------------- |
+| `GET /health` | Verifies overall application availability   |
+| `GET /live`   | Confirms the application process is running |
+| `GET /ready`  | Validates PostgreSQL and Redis connectivity |
 
-**Restart Policies**
+**Automatic Recovery**
 
-Docker restart policies provide automatic service recovery after failures, without manual intervention, covering container crashes, host reboots, and unexpected service failures.
+Docker restart policies enable automatic recovery from container failures, service crashes, and host reboots without manual intervention.
 
 **Deployment Validation**
 
-Deployments are validated using readiness checks before being considered successful, preventing broken releases from reaching production silently. Validation includes application startup, database connectivity, Redis connectivity, and health verification.
+Every deployment is validated through health and readiness checks before being considered successful, ensuring application availability and dependency connectivity.
 
-**Operational Runbooks**
+**Operational Readiness**
 
-Documented operational procedures provide clear guidance for incident response, recovery operations, service validation, and troubleshooting.
+Documented runbooks provide guidance for troubleshooting, incident response, recovery procedures, and service validation.
 
-<p align="center">
-  <img src="screenshots/health-endpoint.png" alt="Health Endpoint Response" width="700">
-</p>
+**Health Endpoint Validation**
 
-<p align="center">
-  <img src="screenshots/readiness-endpoint.png" alt="Readiness Endpoint Response" width="700">
-</p>
+![Health Endpoint Response](screenshots/health-endpoint.png)
+
+**Readiness Endpoint Validation**
+
+![Readiness Endpoint Response](screenshots/readiness-endpoint.png)
 
 ---
+
 
 ## 15. Backup and Recovery
 
@@ -480,15 +497,16 @@ Faster recovery from failure, reduced data loss risk, a repeatable recovery proc
 
 ## 16. CI/CD Pipeline
 
-PulseFort uses GitHub Actions to automate validation and deployment workflows end to end. The pipeline is designed to reduce manual operations while increasing deployment consistency and reliability.
+PulseFort uses GitHub Actions to automate validation, deployment, and production release workflows.
 
-**Validation Stage**
+**Pipeline Stages**
 
-Every change is validated before it is allowed anywhere near production: source code validation, Docker build validation, Terraform validation, and configuration validation.
-
-**Deployment Stage**
-
-After validation succeeds, the pipeline proceeds automatically through application deployment, service restart, health verification, and readiness validation.
+* Code Validation
+* Docker Build Validation
+* Terraform Validation
+* Automated Deployment
+* Health Verification
+* Production Release
 
 **Deployment Flow**
 
@@ -502,24 +520,29 @@ GitHub Repository
 GitHub Actions
        |
        v
-Validation -> Build -> Deployment
+Validate → Build → Deploy
        |
        v
-Health Verification
+Health Checks
        |
        v
 Production Release
 ```
 
-**Deployment Benefits**
+**Benefits**
 
-Reduced manual intervention, consistent and repeatable deployments, faster releases, improved reliability, and fully repeatable operations from commit to production.
+* Automated deployments
+* Consistent release process
+* Reduced manual intervention
+* Faster delivery cycles
+* Improved reliability and repeatability
 
-<p align="center">
-  <img src="screenshots/github-actions-success.png" alt="GitHub Actions Successful Pipeline Run" width="800">
-</p>
+**GitHub Actions Deployment Pipeline**
+
+![GitHub Actions Successful Pipeline Run](screenshots/github-actions-success.png)
 
 ---
+
 
 ## 17. Documentation
 
@@ -555,16 +578,10 @@ cp .env.example .env
 
 Update configuration values as required for your environment.
 
-**Build Services**
+**Build and Start Services**
 
 ```bash
-docker compose build
-```
-
-**Start Platform**
-
-```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
 **Verify Deployment**
@@ -574,19 +591,21 @@ curl http://localhost/health
 curl http://localhost/ready
 ```
 
-**Access Monitoring**
+**Access Services**
 
 ```text
-Grafana Dashboard:
+Application:
+https://YOUR_SERVER_IP/
+
+Grafana:
 https://YOUR_SERVER_IP/grafana/
 
 Prometheus:
-Internal-only monitoring service.
-Accessible from the Docker network and operational validation workflows.
-Not exposed publicly.
+https://YOUR_SERVER_IP/prometheus/
 ```
 
 ---
+
 
 ## 19. Why PulseFort Stands Out
 
