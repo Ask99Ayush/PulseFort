@@ -8,7 +8,7 @@ cd "${APP_DIR}"
 
 echo "Creating rollback point..."
 
-CURRENT_IMAGE=$(docker image ls pulsefort --format "{{.Repository}}:{{.Tag}}" | head -n 1 || true)
+git branch rollback-$(date +%Y%m%d-%H%M%S) >/dev/null 2>&1 || true
 
 echo "Pulling latest code..."
 
@@ -16,11 +16,11 @@ git fetch origin
 
 git reset --hard origin/main
 
-echo "Pulling latest image..."
+echo "Building application image..."
 
-docker compose pull
+docker compose build
 
-echo "Deploying..."
+echo "Deploying services..."
 
 docker compose up -d
 
@@ -32,16 +32,17 @@ echo "Running readiness verification..."
 
 if curl -fsS http://localhost/ready > /dev/null
 then
-    echo "Deployment successful."
-    exit 0
+echo "Deployment successful."
+docker image prune -f
+exit 0
 fi
 
 echo "Deployment failed."
 
-if [ -n "$CURRENT_IMAGE" ]
-then
-    echo "Rollback information available:"
-    echo "$CURRENT_IMAGE"
-fi
+echo "Container status:"
+docker compose ps
+
+echo "Recent logs:"
+docker compose logs --tail=100
 
 exit 1
