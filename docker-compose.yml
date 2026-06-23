@@ -18,7 +18,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost/nginx-health || exit 1"
+          "wget -qO- http://127.0.0.1/nginx-health || exit 1"
         ]
       interval: 30s
       timeout: 10s
@@ -130,8 +130,8 @@ services:
 
     restart: unless-stopped
 
-    ports:
-      - "9090:9090"
+    expose:
+      - "9090"
 
     healthcheck:
       test:
@@ -160,9 +160,11 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_SERVER_ROOT_URL: https://3.6.240.189/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
 
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
 
     depends_on:
       prometheus:
@@ -193,8 +195,8 @@ services:
 
     restart: unless-stopped
 
-    ports:
-      - "9100:9100"
+    expose:
+      - "9100"
 
     command:
       - "--path.rootfs=/host"
@@ -222,8 +224,8 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker:/var/lib/docker:ro
 
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
 
     networks:
       - pulsefort-network

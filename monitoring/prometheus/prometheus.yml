@@ -12,19 +12,19 @@ scrape_configs:
       - targets:
           - app:8000
 
-  # Uncomment on Linux EC2 deployment
-  # - job_name: "node-exporter"
-  #
-  #   static_configs:
-  #     - targets:
-  #         - node-exporter:9100
+  
+  - job_name: "node-exporter"
+  
+    static_configs:
+      - targets:
+          - node-exporter:9100
 
-  # Uncomment on Linux EC2 deployment
-  # - job_name: "cadvisor"
-  #
-  #   static_configs:
-  #     - targets:
-  #         - cadvisor:8080
+
+  - job_name: "cadvisor"
+  
+    static_configs:
+      - targets:
+          - cadvisor:8080
 
   - job_name: "prometheus"
 
