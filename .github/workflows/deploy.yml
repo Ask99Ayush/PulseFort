@@ -6,6 +6,7 @@ on:
       - main
 
 jobs:
+
   validate:
     runs-on: ubuntu-latest
 
@@ -65,23 +66,6 @@ jobs:
 
             cd /opt/pulsefort
 
-            echo "Pulling latest code..."
-            git fetch --all
-            git reset --hard origin/main
+            chmod +x scripts/zero-downtime-deploy.sh
 
-            echo "Building application image..."
-            docker compose build
-
-            echo "Starting services..."
-            docker compose up -d
-
-            echo "Waiting for startup..."
-            sleep 30
-
-            echo "Verifying deployment..."
-            curl -fsS http://localhost/ready
-
-            echo "Cleaning unused images..."
-            docker image prune -f
-
-            echo "Deployment completed successfully."
+            ./scripts/zero-downtime-deploy.sh
