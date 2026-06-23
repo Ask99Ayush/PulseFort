@@ -1,196 +1,262 @@
-# PulseFort Monitoring Guide
+# Monitoring Guide
 
-## Monitoring Stack
+## Overview
 
-PulseFort uses:
+Observability is a core component of PulseFort. The platform includes a full monitoring stack that provides visibility into application performance, infrastructure health, container resource usage, and service availability.
 
-- Prometheus
-- Grafana
-- Node Exporter
-- cAdvisor
+The monitoring architecture enables engineers to validate deployments, troubleshoot incidents, monitor resource utilization, and maintain operational awareness across the platform.
 
 ---
 
-## Architecture
+## Monitoring Stack
 
-```text
-FastAPI
-   |
-   v
-Prometheus
-   |
-   v
-Grafana
+| Component     | Purpose                      |
+|---------------|------------------------------|
+| Prometheus    | Metrics collection & storage |
+| Grafana       | Visualization & dashboards   |
+| Node Exporter | Host-level metrics           |
+| cAdvisor      | Container-level metrics      |
 
-Node Exporter ---> Prometheus
-cAdvisor -------> Prometheus
+---
+
+## Monitoring Architecture
+
 ```
+FastAPI       ──► Prometheus ──► Grafana
+Node Exporter ──► Prometheus
+cAdvisor      ──► Prometheus
+```
+
+Metrics from multiple sources are aggregated by Prometheus and visualized in Grafana.
 
 ---
 
 ## Prometheus
 
-URL:
+Central metrics collection and storage engine.
 
-```text
-http://SERVER_IP:9090
+**Access**
+
+```
+Internal Docker service (http://prometheus:9090)
 ```
 
-Purpose:
+**Monitored Targets**
 
-- Application Metrics
-- Container Metrics
-- Host Metrics
+```
+pulsefort-app
+prometheus
+node-exporter
+cadvisor
+```
 
-Configured Targets:
+**Application Metrics** — collected from `/metrics`
 
-- pulsefort-app
-- prometheus
-- node-exporter
-- cadvisor
+- HTTP request volume
+- Endpoint activity
+- Request latency
+- Service availability
+
+**Host Metrics** — collected via Node Exporter
+
+- CPU usage
+- Memory utilization
+- Disk usage
+- Network statistics
+
+**Container Metrics** — collected via cAdvisor
+
+- Container CPU and memory
+- Network utilization
+- Filesystem usage
+- Container lifecycle events
 
 ---
 
 ## Grafana
 
-URL:
+Dashboard and visualization platform for collected metrics.
 
-```text
-http://SERVER_IP:3000
+**Access**
+
+```
+https://SERVER_IP/grafana/
 ```
 
-Credentials:
+**Authentication** — configured through environment variables
 
-```text
-Configured via environment variables
 ```
-
-Environment Variables:
-
-```env
 GRAFANA_ADMIN_USER
 GRAFANA_ADMIN_PASSWORD
 ```
 
----
+Use strong credentials for all production deployments.
 
-## Dashboard
+**Default Dashboard: PulseFort Overview**
 
-Default Dashboard:
+Infrastructure panels:
 
-```text
-PulseFort Overview
-```
+- CPU utilization
+- Memory consumption
+- Disk usage
+- Network throughput
 
-Metrics Included:
+Container panels:
 
-- Application Availability
-- Container Count
-- CPU Usage
-- Memory Usage
-- Network RX
-- Network TX
+- Container count and status
+- Resource utilization
+- Container availability
+
+Application panels:
+
+- Request volume
+- Service health
+- Endpoint activity
 
 ---
 
 ## Node Exporter
 
-Purpose:
+Provides host-level metrics from the EC2 operating system.
 
-Host-level metrics.
+**Endpoint**
 
-Endpoint:
-
-```text
-http://SERVER_IP:9100/metrics
+```
+Internal only (Node Exporter)
 ```
 
-Recommended:
+**Metrics Collected**
 
-Restrict access to internal networks.
+- CPU utilization and load
+- Memory usage and availability
+- Disk and filesystem statistics
+- Network traffic and interface activity
+
+Node Exporter should be accessible only from internal monitoring systems. Public exposure is not recommended.
 
 ---
 
 ## cAdvisor
 
-Purpose:
+Provides container resource consumption and runtime visibility.
 
-Container metrics.
+**Endpoint**
 
-Endpoint:
-
-```text
-http://SERVER_IP:8080
+```
+Internal only (cAdvisor)
 ```
 
-Recommended:
+**Metrics Collected**
 
-Restrict access to internal networks.
+- Container CPU and memory usage
+- Filesystem and network utilization
+- Container state and uptime
+- Resource pressure and utilization trends
+
+cAdvisor should remain internal and should not be exposed publicly.
 
 ---
 
-## Prometheus Validation
+## Validation Procedures
 
-Open:
+Run after every deployment.
 
-```text
-Status -> Targets
+**Prometheus — verify targets**
+
+```
+Internal Docker service (http://prometheus:9090) → Status → Targets
 ```
 
-Expected:
+All configured targets should report `UP`.
 
-```text
-UP
-UP
-UP
-UP
-```
+**Grafana — verify dashboards**
 
----
+- Grafana loads successfully
+- Prometheus datasource is connected
+- Dashboards render with data
 
-## Grafana Validation
-
-Verify:
-
-- Datasource connected
-- Dashboard loads
-- Metrics visible
-
----
-
-## Troubleshooting
-
-### Target Down
-
-Check:
-
-```bash
-docker compose ps
-```
-
-Then:
-
-```bash
-docker compose logs <service>
-```
-
----
-
-### No Metrics
-
-Verify:
+**Application metrics**
 
 ```bash
 curl http://localhost/metrics
 ```
 
+Expected: Prometheus-formatted metrics output.
+
 ---
 
-### Grafana Cannot Connect
+## Common Monitoring Workflows
 
-Verify:
+**Verify service availability**
+
+```bash
+curl http://localhost/health
+curl http://localhost/ready
+```
+
+**Check running containers**
+
+```bash
+docker compose ps
+```
+
+**Review monitoring logs**
+
+```bash
+docker compose logs prometheus
+docker compose logs grafana
+docker compose logs node-exporter
+docker compose logs cadvisor
+```
+
+---
+
+## Troubleshooting
+
+**Target reported as DOWN**
+
+```bash
+docker compose ps
+docker compose logs <service>
+```
+
+Investigate container health and network connectivity.
+
+**No metrics available**
+
+```bash
+curl http://localhost/metrics
+```
+
+Check Prometheus target configuration under Status → Targets.
+
+**Grafana cannot connect to Prometheus**
 
 ```bash
 docker compose logs grafana
 docker compose logs prometheus
 ```
+
+Verify Prometheus is running and the datasource URL is correctly configured.
+
+**Missing dashboard data**
+
+- Confirm Prometheus targets are UP
+- Verify time range selection
+- Confirm datasource is connected
+
+---
+
+## Operational Benefits
+
+- Centralized visibility across infrastructure and application
+- Faster troubleshooting with targeted metrics
+- Deployment validation through health and readiness checks
+- Capacity planning and performance analysis
+- Container health and service availability monitoring
+
+---
+
+## Conclusion
+
+PulseFort's monitoring stack combines Prometheus, Grafana, Node Exporter, and cAdvisor to deliver comprehensive observability across application, infrastructure, and container layers. By integrating metrics collection, visualization, validation, and troubleshooting workflows, the platform provides the observability foundation required for reliable production operations.

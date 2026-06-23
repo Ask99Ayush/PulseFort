@@ -1,115 +1,89 @@
-# PulseFort Backup & Restore Guide
+# Backup & Restore Guide
 
 ## Overview
 
-PulseFort uses PostgreSQL logical backups generated with:
-
-```bash
-pg_dump
-```
-
-Backups are stored in:
-
-```text
-backups/
-```
+PulseFort uses PostgreSQL logical backups generated through `pg_dump`. Backups are timestamped, stored locally, and can be restored using the provided recovery scripts. The strategy supports disaster recovery, data migration, and rollback scenarios.
 
 ---
 
-## Creating Backups
-
-Run:
+## Creating a Backup
 
 ```bash
 ./scripts/backup.sh
 ```
 
-Example:
+Example output:
 
-```text
+```
 backups/pulsefort_20260622_120000.sql
 ```
 
+Each file contains a complete logical export of the PostgreSQL database.
+
 ---
 
-## Backup Retention
+## Retention Policy
 
-Retention Policy:
-
-- Keep backups for 7 days
-- Automatically remove backups older than 7 days
-
-Implemented in:
-
-```text
-scripts/backup.sh
-```
-
-Command:
+Backups older than 7 days are automatically removed during each backup run.
 
 ```bash
 find backups \
--type f \
--name "*.sql" \
--mtime +7 \
--delete
+  -type f \
+  -name "*.sql" \
+  -mtime +7 \
+  -delete
 ```
+
+This keeps storage usage predictable while maintaining recent recovery points.
 
 ---
 
 ## Backup Security
 
-Directory Permissions:
+Restrict access to the backup directory and its contents.
 
 ```bash
 chmod 700 backups
-```
-
-Backup File Permissions:
-
-```bash
 chmod 600 backups/*.sql
 ```
 
-Only administrators should have access.
+Only authorized administrators should have read access to backup files.
 
 ---
 
 ## Restore Procedure
 
-Restore:
-
 ```bash
-./scripts/restore.sh backups/<file>.sql
+./scripts/restore.sh backups/<backup-file>.sql
 ```
 
 Example:
 
 ```bash
-./scripts/restore.sh \
-backups/pulsefort_20260622_120000.sql
+./scripts/restore.sh backups/pulsefort_20260622_120000.sql
 ```
+
+The restore script imports the selected backup into PostgreSQL and rebuilds the database state.
 
 ---
 
 ## Recovery Validation
 
-After restore:
+After a restore, verify the platform is fully operational.
 
-Verify PostgreSQL:
+**Verify PostgreSQL**
 
 ```bash
-docker compose exec postgres \
-psql -U pulsefort -d pulsefort
+docker compose exec postgres psql -U pulsefort -d pulsefort
 ```
 
-Verify Users Table:
+**Verify Application Data**
 
 ```sql
 SELECT * FROM users;
 ```
 
-Verify Application:
+**Verify Platform Readiness**
 
 ```bash
 curl http://localhost/ready
@@ -129,21 +103,22 @@ Expected:
 
 ## Disaster Recovery Workflow
 
-1. Provision server
-2. Start Docker Compose stack
-3. Restore database backup
-4. Validate PostgreSQL
-5. Validate Redis
-6. Validate Application
-7. Validate Monitoring
-8. Resume service
+1. Provision infrastructure
+2. Start the Docker Compose stack
+3. Restore the latest database backup
+4. Verify PostgreSQL connectivity
+5. Verify Redis availability
+6. Validate application readiness
+7. Confirm monitoring services are running
+8. Resume normal operations
 
 ---
 
-## Recommended Future Enhancements
+## Future Enhancements
 
-- Compressed backups
-- S3 backup storage
-- Automated daily backups
+- Compressed backup archives
+- Automated scheduled backups
+- AWS S3 remote storage
 - Backup integrity verification
-- Encrypted backups
+- Encrypted archives
+- Cross-region replication

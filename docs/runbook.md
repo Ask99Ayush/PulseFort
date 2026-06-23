@@ -1,211 +1,259 @@
-# PulseFort Operations Runbook
+# Operations Runbook
 
-## Service Health Check
+## Overview
 
-Application:
+This runbook provides operational procedures, validation steps, troubleshooting workflows, and recovery actions for managing the PulseFort platform. Use it to diagnose issues, verify platform health, perform routine maintenance, and restore service during incidents.
+
+---
+
+## Platform Health Verification
+
+Run after deployments, infrastructure changes, maintenance, or incident recovery.
+
+**Health**
 
 ```bash
 curl http://localhost/health
 ```
 
-Readiness:
+```json
+{ "status": "healthy" }
+```
+
+**Liveness**
+
+```bash
+curl http://localhost/live
+```
+
+```json
+{ "alive": true }
+```
+
+**Readiness**
 
 ```bash
 curl http://localhost/ready
 ```
 
----
-
-## Container Status
-
-```bash
-docker compose ps
+```json
+{ "ready": true, "postgres": true, "redis": true }
 ```
 
 ---
 
-## View Logs
-
-All Services:
+## Container Operations
 
 ```bash
-docker compose logs -f
+docker compose ps               # view running services
+docker compose up -d            # start platform
+docker compose down             # stop platform
+docker compose restart          # restart all services
+docker compose restart app      # restart application
+docker compose restart postgres # restart database
+docker compose restart redis    # restart cache
+docker compose restart nginx    # restart proxy
 ```
 
-Specific Service:
+Expected services: `nginx`, `app`, `postgres`, `redis`, `prometheus`, `grafana`, `node-exporter`, `cadvisor`
+
+---
+
+## Log Management
 
 ```bash
-docker compose logs -f app
+docker compose logs             # all service logs
+docker compose logs -f          # stream logs
+docker compose logs app         # application
+docker compose logs nginx       # reverse proxy
+docker compose logs postgres    # database
+docker compose logs redis       # cache
+docker compose logs prometheus  # metrics collection
+docker compose logs grafana     # dashboards
+docker compose logs cadvisor    # container metrics
+docker compose logs node-exporter # host metrics
 ```
 
 ---
 
-## Restart Services
+## Deployment Operations
 
-All:
-
-```bash
-docker compose restart
-```
-
-Application:
-
-```bash
-docker compose restart app
-```
-
----
-
-## Deploy Latest Version
+**Standard Deployment**
 
 ```bash
 bash scripts/deploy.sh
 ```
 
+Pulls latest source, rebuilds containers, restarts services, validates deployment.
+
+**Health-Gated Deployment**
+
+```bash
+bash scripts/zero-downtime-deploy.sh
+```
+
+Includes readiness verification, failure detection, and rollback support. Use for production deployments.
+
 ---
 
-## Backup Database
+## Database Operations
+
+**Create backup**
 
 ```bash
 bash scripts/backup.sh
 ```
 
----
-
-## Restore Database
+**Restore backup**
 
 ```bash
-bash scripts/restore.sh backups/<file>.sql
+bash scripts/restore.sh backups/<backup-file>.sql
+```
+
+**Verify database connectivity**
+
+```bash
+docker compose exec postgres psql -U pulsefort -d pulsefort
+```
+
+**Verify data**
+
+```sql
+SELECT * FROM users;
 ```
 
 ---
 
 ## Terraform Operations
 
-Initialize:
-
 ```bash
-terraform init
-```
+cd terraform/environments/prod
 
-Plan:
-
-```bash
-terraform plan
-```
-
-Apply:
-
-```bash
-terraform apply
-```
-
-Destroy:
-
-```bash
-terraform destroy
+terraform init       # initialize providers
+terraform validate   # validate configuration
+terraform plan       # review planned changes
+terraform apply      # provision infrastructure
+terraform destroy    # remove infrastructure (use with caution)
 ```
 
 ---
 
 ## Security Verification
 
-Firewall:
-
 ```bash
-sudo ufw status
-```
-
-Fail2Ban:
-
-```bash
-sudo fail2ban-client status sshd
-```
-
-SSH:
-
-```bash
-sudo sshd -t
+sudo ufw status                          # firewall rules
+sudo fail2ban-client status sshd         # brute-force protection
+sudo sshd -t                             # SSH configuration (no output = valid)
 ```
 
 ---
 
 ## Monitoring Verification
 
-Prometheus:
+**Prometheus targets**
 
-```text
-http://SERVER_IP:9090
+```
+docker exec -it pulsefort-prometheus wget -qO- http://localhost:9090/-/healthy
 ```
 
-Grafana:
+All targets should report `UP`.
 
-```text
-http://SERVER_IP:3000
+**Grafana dashboards**
+
+```
+https://SERVER_IP/grafana/
+```
+
+Verify datasource connected and dashboards rendering.
+
+**Application metrics**
+
+```bash
+curl http://localhost/metrics
 ```
 
 ---
 
 ## Incident Response
 
-### Application Down
+### Application Unavailable
 
-1. Check Docker containers
-2. Check application logs
-3. Verify PostgreSQL
-4. Verify Redis
-5. Restart application
-
-Commands:
+Symptoms: health endpoint fails, API requests fail, readiness endpoint unavailable.
 
 ```bash
 docker compose ps
-
 docker compose logs app
-
+docker compose logs postgres
+docker compose logs redis
 docker compose restart app
+curl http://localhost/ready
 ```
-
----
 
 ### Database Failure
 
-Verify:
-
 ```bash
 docker compose logs postgres
+docker compose ps
+bash scripts/restore.sh backups/<backup-file>.sql
+curl http://localhost/ready
 ```
 
-Restore:
+### Redis Failure
 
 ```bash
-bash scripts/restore.sh backups/<file>.sql
+docker compose logs redis
+docker compose restart redis
+curl http://localhost/ready
 ```
 
----
+### High CPU Usage
 
-### High CPU
+Review Grafana dashboards, Node Exporter metrics, and cAdvisor container metrics. Identify the resource-intensive container, review its logs, and restart if required.
 
-Check:
+### Monitoring Data Missing
 
-- Grafana Dashboard
-- Node Exporter Metrics
-- cAdvisor Metrics
+```bash
+docker compose logs prometheus
+docker compose logs grafana
+docker compose restart prometheus
+docker compose restart grafana
+```
 
-Identify:
-
-- Container consuming resources
-- Host bottlenecks
-
-Take action accordingly.
+Verify targets under Prometheus → Status → Targets.
 
 ---
 
-## Recovery Procedure
+## Disaster Recovery Procedure
 
-1. Provision Infrastructure
-2. Deploy Application
-3. Restore Database
-4. Validate Monitoring
-5. Validate Security
-6. Resume Operations
+1. Provision infrastructure via Terraform
+2. Configure networking and security groups
+3. Deploy PulseFort via deployment script
+4. Restore latest database backup
+5. Verify PostgreSQL connectivity
+6. Verify Redis availability
+7. Validate monitoring stack
+8. Verify security controls
+9. Confirm readiness endpoint returns healthy
+10. Resume operations
+
+---
+
+## Post-Incident Validation Checklist
+
+- All containers running
+- Health endpoint operational
+- Readiness endpoint operational
+- PostgreSQL accessible
+- Redis accessible
+- Prometheus collecting metrics
+- Grafana dashboards functional
+- Security controls active
+- Backup procedures operational
+
+The platform should not be considered fully restored until all checks pass.
+
+---
+
+## Conclusion
+
+This runbook covers the core operational procedures for deploying, validating, troubleshooting, and recovering PulseFort. Following documented workflows helps operators respond consistently to incidents and maintain platform reliability over time.
