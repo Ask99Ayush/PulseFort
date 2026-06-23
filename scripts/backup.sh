@@ -1,6 +1,11 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
+
+if [ ! -f .env ]; then
+    echo ".env file not found"
+    exit 1
+fi
 
 set -a
 source .env
@@ -24,6 +29,11 @@ pg_dump \
 -d "${POSTGRES_DB}" \
 > "${BACKUP_FILE}"
 
+if [ ! -s "${BACKUP_FILE}" ]; then
+    echo "Backup failed"
+    exit 1
+fi
+
 chmod 600 "${BACKUP_FILE}"
 
 echo "Backup created: ${BACKUP_FILE}"
@@ -37,3 +47,5 @@ find "${BACKUP_DIR}" \
 -delete
 
 echo "Retention completed."
+
+echo "Backup process finished successfully."
