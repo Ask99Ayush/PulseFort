@@ -12,6 +12,7 @@ services:
 
     ports:
       - "80:80"
+      - "443:443"
 
     healthcheck:
       test:
@@ -27,6 +28,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
 
     networks:
       - pulsefort-network
@@ -124,7 +126,6 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.5.0
-
     container_name: pulsefort-prometheus
 
     restart: unless-stopped
@@ -141,6 +142,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
 
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -151,7 +153,6 @@ services:
 
   grafana:
     image: grafana/grafana:12.1.0
-
     container_name: pulsefort-grafana
 
     restart: unless-stopped
@@ -163,6 +164,10 @@ services:
     ports:
       - "3000:3000"
 
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
     healthcheck:
       test:
         [
@@ -172,21 +177,18 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 20s
 
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
 
-    depends_on:
-      - prometheus
-
     networks:
       - pulsefort-network
 
   node-exporter:
     image: prom/node-exporter:v1.9.1
-
     container_name: pulsefort-node-exporter
 
     restart: unless-stopped
@@ -203,41 +205,44 @@ services:
     networks:
       - pulsefort-network
 
-  # Uncomment on Linux EC2 deployment
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.52.1
+    container_name: pulsefort-cadvisor
 
-  # cadvisor:
-  #   image: gcr.io/cadvisor/cadvisor:v0.52.1
-  #   container_name: pulsefort-cadvisor
-  #
-  #   restart: unless-stopped
-  #
-  #   privileged: true
-  #
-  #   devices:
-  #     - /dev/kmsg
-  #
-  #   volumes:
-  #     - /:/rootfs:ro
-  #     - /var/run:/var/run:ro
-  #     - /sys:/sys:ro
-  #     - /var/lib/docker:/var/lib/docker:ro
-  #
-  #   ports:
-  #     - "8080:8080"
-  #
-  #   networks:
-  #     - pulsefort-network
+    restart: unless-stopped
+
+    privileged: true
+
+    devices:
+      - /dev/kmsg
+
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+
+    ports:
+      - "8080:8080"
+
+    networks:
+      - pulsefort-network
 
 volumes:
 
   postgres_data:
+    name: pulsefort_postgres_data
 
   redis_data:
+    name: pulsefort_redis_data
 
   grafana_data:
+    name: pulsefort_grafana_data
 
   prometheus_data:
+    name: pulsefort_prometheus_data
 
 networks:
+
   pulsefort-network:
     driver: bridge
