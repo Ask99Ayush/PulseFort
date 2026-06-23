@@ -66,6 +66,10 @@ jobs:
 
             cd /opt/pulsefort
 
+
+            git fetch --all
+            git reset --hard origin/main
+
             chmod +x scripts/zero-downtime-deploy.sh
 
             ./scripts/zero-downtime-deploy.sh
